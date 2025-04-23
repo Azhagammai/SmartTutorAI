@@ -3,12 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { insertLearningStyleSchema, insertForumDiscussionSchema, insertForumReplySchema, insertAiTutorMessageSchema } from "@shared/schema";
-import OpenAI from "openai";
-
-// Initialize OpenAI with API key from environment variable
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY || "dummy-key-for-development" 
-});
+import { processAiTutorMessage } from "./ai-tutor";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes
