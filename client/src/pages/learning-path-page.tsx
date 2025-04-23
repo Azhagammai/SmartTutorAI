@@ -138,7 +138,36 @@ export default function LearningPathPage() {
                 )}
                 
                 <div className="mt-6">
-                  <Button size="lg" className="w-full">
+                  <Button 
+                    size="lg" 
+                    className="w-full"
+                    onClick={() => {
+                      if (!progress.progress) {
+                        // Get first module
+                        if (modules && modules.length > 0) {
+                          const firstModule = modules.sort((a: any, b: any) => a.order - b.order)[0];
+                          
+                          // Create initial progress
+                          fetch(`/api/progress/${courseId}`, {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              progress: 5,
+                              currentModuleId: firstModule.id,
+                              completed: false
+                            })
+                          })
+                          .then(res => res.json())
+                          .then(() => {
+                            window.location.reload();
+                          })
+                          .catch(err => console.error('Error creating progress:', err));
+                        }
+                      }
+                    }}
+                  >
                     {progress.progress > 0 ? "Continue Learning" : "Start Learning"}
                   </Button>
                 </div>
@@ -169,7 +198,27 @@ export default function LearningPathPage() {
                             <span className="text-sm text-gray-500">Module {index + 1}</span>
                             <h4 className="font-medium">{module.title}</h4>
                           </div>
-                          <Button variant="outline" size="sm">
+                          <Button variant="outline" size="sm" onClick={() => {
+                            // Create or update progress when starting a module
+                            if (!progress.progress) {
+                              fetch(`/api/progress/${courseId}`, {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                  progress: 10,
+                                  currentModuleId: module.id,
+                                  completed: false
+                                })
+                              })
+                              .then(res => res.json())
+                              .then(() => {
+                                window.location.reload();
+                              })
+                              .catch(err => console.error('Error updating progress:', err));
+                            }
+                          }}>
                             {progress.currentModuleId === module.id ? "Continue" : "Start"}
                           </Button>
                         </div>
@@ -238,8 +287,8 @@ export default function LearningPathPage() {
     
     return (
       <>
-        {filteredCourses.map((course, index) => {
-          const progress = allProgress?.find(p => p.courseId === course.id) || { progress: 0, completed: false };
+        {filteredCourses.map((course: any, index: number) => {
+          const progress = allProgress?.find((p: any) => p.courseId === course.id) || { progress: 0, completed: false };
           
           return (
             <motion.div 
@@ -258,7 +307,7 @@ export default function LearningPathPage() {
                   />
                   {progress.completed && (
                     <div className="absolute top-2 right-2">
-                      <Badge variant="success" className="bg-green-500">Completed</Badge>
+                      <Badge variant="secondary" className="bg-green-500 text-white">Completed</Badge>
                     </div>
                   )}
                   {progress.progress > 0 && !progress.completed && (
