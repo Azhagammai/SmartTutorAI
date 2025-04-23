@@ -14,6 +14,44 @@ import { Search, Filter, BookOpen } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
 
+// Define interfaces for better type safety
+interface Course {
+  id: number;
+  title: string;
+  description: string;
+  difficulty: string;
+  domain: string;
+  estimatedDuration: string;
+  thumbnail?: string;
+}
+
+interface Module {
+  id: number;
+  courseId: number;
+  title: string;
+  description: string;
+  content: string;
+  videoUrl?: string;
+  order: number;
+}
+
+interface Progress {
+  id?: number;
+  userId?: number;
+  courseId: number;
+  progress: number;
+  completed: boolean;
+  currentModuleId?: number;
+}
+
+interface LearningStyle {
+  id?: number;
+  userId?: number;
+  learningType: string;
+  domain: string;
+  assessmentResults?: Record<string, any>;
+}
+
 export default function LearningPathPage() {
   const { user } = useAuth();
   const [location] = useLocation();
@@ -25,25 +63,25 @@ export default function LearningPathPage() {
   const courseIdParam = urlParams.get("courseId");
   
   // Fetch learning style
-  const { data: learningStyle } = useQuery({
+  const { data: learningStyle } = useQuery<LearningStyle>({
     queryKey: ["/api/learning-style"],
     enabled: !!user,
   });
   
   // Fetch courses
-  const { data: courses, isLoading: isLoadingCourses } = useQuery({
+  const { data: courses, isLoading: isLoadingCourses } = useQuery<Course[]>({
     queryKey: ["/api/courses"],
     enabled: !!user,
   });
   
   // Fetch all user progress
-  const { data: allProgress } = useQuery({
+  const { data: allProgress } = useQuery<Progress[]>({
     queryKey: ["/api/progress"],
     enabled: !!user,
   });
   
   // Filter courses based on search and filter selection
-  const filteredCourses = courses?.filter((course: any) => {
+  const filteredCourses = courses?.filter((course: Course) => {
     const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       course.description.toLowerCase().includes(searchQuery.toLowerCase());
     
@@ -53,7 +91,7 @@ export default function LearningPathPage() {
     }
     
     // Find progress for this course
-    const progress = allProgress?.find((p: any) => p.courseId === course.id);
+    const progress = allProgress?.find((p: Progress) => p.courseId === course.id);
     
     if (selectedFilter === "in-progress") {
       return matchesSearch && progress && progress.progress > 0 && !progress.completed;
@@ -71,8 +109,8 @@ export default function LearningPathPage() {
     if (!courseIdParam || !courses) return null;
     
     const courseId = parseInt(courseIdParam);
-    const course = courses.find((c: any) => c.id === courseId);
-    const progress = allProgress?.find((p: any) => p.courseId === courseId) || { progress: 0, completed: false };
+    const course = courses.find((c: Course) => c.id === courseId);
+    const progress = allProgress?.find((p: Progress) => p.courseId === courseId) || { progress: 0, completed: false, currentModuleId: undefined };
     
     if (!course) {
       return (
@@ -88,7 +126,7 @@ export default function LearningPathPage() {
     }
     
     // Fetch modules for this course
-    const { data: modules, isLoading: isLoadingModules } = useQuery<any[]>({
+    const { data: modules, isLoading: isLoadingModules } = useQuery<Module[]>({
       queryKey: [`/api/courses/${courseId}/modules`],
       enabled: !!courseId,
     });
@@ -145,7 +183,7 @@ export default function LearningPathPage() {
                       if (!progress.progress) {
                         // Get first module
                         if (modules && modules.length > 0) {
-                          const firstModule = modules.sort((a: any, b: any) => a.order - b.order)[0];
+                          const firstModule = modules.sort((a: Module, b: Module) => a.order - b.order)[0];
                           
                           // Create initial progress
                           fetch(`/api/progress/${courseId}`, {
@@ -188,7 +226,7 @@ export default function LearningPathPage() {
                   <p className="text-gray-500 py-4">No modules available for this course yet.</p>
                 ) : (
                   <div className="space-y-4">
-                    {modules.map((module: any, index: number) => (
+                    {modules.map((module: Module, index: number) => (
                       <div 
                         key={module.id} 
                         className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
@@ -246,9 +284,9 @@ export default function LearningPathPage() {
             <div className="bg-white p-5 rounded-lg shadow border border-gray-200">
               <h3 className="text-lg font-semibold mb-3">Related Courses</h3>
               {courses
-                .filter((c: any) => c.domain === course.domain && c.id !== course.id)
+                .filter((c: Course) => c.domain === course.domain && c.id !== course.id)
                 .slice(0, 3)
-                .map((relatedCourse: any) => (
+                .map((relatedCourse: Course) => (
                   <div key={relatedCourse.id} className="mb-4 last:mb-0">
                     <h4 className="font-medium text-sm">{relatedCourse.title}</h4>
                     <p className="text-xs text-gray-500 mb-2">{relatedCourse.difficulty} • {relatedCourse.estimatedDuration}</p>
@@ -287,8 +325,8 @@ export default function LearningPathPage() {
     
     return (
       <>
-        {filteredCourses.map((course: any, index: number) => {
-          const progress = allProgress?.find((p: any) => p.courseId === course.id) || { progress: 0, completed: false };
+        {filteredCourses.map((course: Course, index: number) => {
+          const progress = allProgress?.find((p: Progress) => p.courseId === course.id) || { progress: 0, completed: false, currentModuleId: undefined };
           
           return (
             <motion.div 
