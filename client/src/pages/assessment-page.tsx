@@ -121,10 +121,21 @@ export default function AssessmentPage() {
   // Submit the assessment
   const handleSubmit = () => {
     setIsSubmitting(true);
+    console.log("Submitting learning style:", {
+      learningType: learningStyleResult,
+      domain: selectedDomain,
+      assessmentResults: answers
+    });
+    
     submitLearningStyleMutation.mutate({
       learningType: learningStyleResult,
       domain: selectedDomain,
       assessmentResults: answers
+    }, {
+      onError: (error) => {
+        console.error("Learning style submission error:", error);
+        setIsSubmitting(false);
+      }
     });
   };
 
@@ -192,8 +203,8 @@ export default function AssessmentPage() {
           {domains.map((domain) => (
             <Card 
               key={domain.id} 
-              className={`cursor-pointer transition-all ${selectedDomain === domain.name ? 'ring-2 ring-primary' : 'hover:shadow-md'}`}
-              onClick={() => setSelectedDomain(domain.name)}
+              className={`cursor-pointer transition-all ${selectedDomain === domain.id ? 'ring-2 ring-primary' : 'hover:shadow-md'}`}
+              onClick={() => setSelectedDomain(domain.id)}
             >
               <div className="aspect-video w-full overflow-hidden">
                 <img src={domain.image} alt={domain.name} className="w-full h-full object-cover" />
@@ -201,7 +212,7 @@ export default function AssessmentPage() {
               <CardHeader className="py-4">
                 <CardTitle className="text-lg flex items-center justify-between">
                   {domain.name}
-                  {selectedDomain === domain.name && (
+                  {selectedDomain === domain.id && (
                     <CheckCircle className="h-5 w-5 text-primary" />
                   )}
                 </CardTitle>
@@ -250,6 +261,9 @@ export default function AssessmentPage() {
 
   // Render the completion step
   const renderComplete = () => {
+    // Find the selected domain name
+    const domainName = domains?.find(d => d.id === selectedDomain)?.name || selectedDomain;
+    
     return (
       <div className="text-center">
         <div className="mx-auto bg-green-50 rounded-full w-20 h-20 flex items-center justify-center mb-6">
@@ -257,7 +271,7 @@ export default function AssessmentPage() {
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-4">Assessment Complete!</h2>
         <p className="text-gray-600 mb-8 max-w-md mx-auto">
-          We've created your personalized learning path based on your {learningStyleResult} learning style and interest in {selectedDomain}.
+          We've created your personalized learning path based on your {learningStyleResult} learning style and interest in {domainName}.
         </p>
         <Button size="lg" asChild>
           <a href="/dashboard">Go to Dashboard</a>
