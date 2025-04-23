@@ -6,7 +6,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { analyzeLearningStyle } from "@/lib/openai";
 import Header from "@/components/header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -23,6 +23,25 @@ const STEPS = {
   COMPLETE: 'complete'
 };
 
+// Assessment question type
+interface AssessmentQuestion {
+  id: number;
+  question: string;
+  options: Array<{
+    id: string;
+    text: string;
+    learningTypeIndicator: string;
+  }>;
+}
+
+// Domain type
+interface Domain {
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+}
+
 export default function AssessmentPage() {
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(STEPS.WELCOME);
@@ -33,13 +52,13 @@ export default function AssessmentPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch assessment questions
-  const { data: questions, isLoading: isLoadingQuestions } = useQuery({
+  const { data: questions, isLoading: isLoadingQuestions } = useQuery<AssessmentQuestion[]>({
     queryKey: ["/api/assessment-questions"],
     enabled: !!user,
   });
 
   // Fetch available domains
-  const { data: domains, isLoading: isLoadingDomains } = useQuery({
+  const { data: domains, isLoading: isLoadingDomains } = useQuery<Domain[]>({
     queryKey: ["/api/domains"],
     enabled: !!user,
   });
@@ -87,8 +106,8 @@ export default function AssessmentPage() {
       return;
     }
 
-    if (currentStep === STEPS.QUESTIONS) {
-      if (currentQuestionIndex < (questions?.length || 0) - 1) {
+    if (currentStep === STEPS.QUESTIONS && questions) {
+      if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
       } else {
         // Analyze answers to determine learning style
@@ -110,9 +129,9 @@ export default function AssessmentPage() {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     } else if (currentStep === STEPS.QUESTIONS && currentQuestionIndex === 0) {
       setCurrentStep(STEPS.WELCOME);
-    } else if (currentStep === STEPS.LEARNING_STYLE) {
+    } else if (currentStep === STEPS.LEARNING_STYLE && questions) {
       setCurrentStep(STEPS.QUESTIONS);
-      setCurrentQuestionIndex(questions?.length ? questions.length - 1 : 0);
+      setCurrentQuestionIndex(questions.length - 1);
     } else if (currentStep === STEPS.DOMAINS) {
       setCurrentStep(STEPS.LEARNING_STYLE);
     }
@@ -120,6 +139,8 @@ export default function AssessmentPage() {
 
   // Submit the assessment
   const handleSubmit = () => {
+    if (!selectedDomain) return;
+    
     setIsSubmitting(true);
     console.log("Submitting learning style:", {
       learningType: learningStyleResult,
@@ -142,6 +163,7 @@ export default function AssessmentPage() {
   // Render progress indicator for questions
   const renderProgress = () => {
     if (!questions) return null;
+    
     const progressPercentage = ((currentQuestionIndex + 1) / questions.length) * 100;
     return (
       <div className="mb-6">
@@ -261,8 +283,8 @@ export default function AssessmentPage() {
 
   // Render the completion step
   const renderComplete = () => {
-    // Find the selected domain name
-    const domainName = domains?.find(d => d.id === selectedDomain)?.name || selectedDomain;
+    const selectedDomainObj = domains?.find(d => d.id === selectedDomain);
+    const domainName = selectedDomainObj?.name || selectedDomain;
     
     return (
       <div className="text-center">
@@ -304,6 +326,10 @@ export default function AssessmentPage() {
       return null;
     }
 
+    const isQuestionAnswered = 
+      currentStep !== STEPS.QUESTIONS || 
+      (questions && currentQuestionIndex < questions.length && answers[questions[currentQuestionIndex].id]);
+
     return (
       <div className="flex justify-between mt-8">
         <Button
@@ -332,7 +358,7 @@ export default function AssessmentPage() {
         ) : (
           <Button 
             onClick={handleNext}
-            disabled={currentStep === STEPS.QUESTIONS && !answers[questions?.[currentQuestionIndex]?.id]}
+            disabled={!isQuestionAnswered}
           >
             Next
             <ChevronRight className="h-4 w-4 ml-2" />
