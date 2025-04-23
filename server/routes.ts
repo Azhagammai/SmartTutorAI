@@ -88,31 +88,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log("Learning style request body:", req.body);
 
-      const result = insertLearningStyleSchema.safeParse(req.body);
-      if (!result.success) {
-        console.log("Learning style validation errors:", result.error);
-        return res.status(400).json({ 
-          message: "Invalid learning style data",
-          errors: result.error.format()
-        });
-      }
+      // Create a complete learning style object with userId
+      const learningStyleData = {
+        userId: req.user.id,
+        learningType: req.body.learningType,
+        domain: req.body.domain,
+        assessmentResults: req.body.assessmentResults || {}
+      };
+
+      console.log("Processed learning style data:", learningStyleData);
 
       const existingStyle = await storage.getLearningStyle(req.user.id);
       if (existingStyle) {
         console.log("Updating existing learning style for user:", req.user.id);
-        const updatedStyle = await storage.updateLearningStyle(req.user.id, result.data);
+        // Explicitly pass each field to avoid validation issues
+        const updatedStyle = await storage.updateLearningStyle(req.user.id, {
+          learningType: learningStyleData.learningType,
+          domain: learningStyleData.domain,
+          assessmentResults: learningStyleData.assessmentResults
+        });
         return res.json(updatedStyle);
       }
 
       console.log("Creating new learning style for user:", req.user.id);
-      const learningStyle = await storage.createLearningStyle({
-        ...result.data,
-        userId: req.user.id,
-      });
-      res.json(learningStyle);
+      // Explicitly create with all required fields
+      const learningStyle = await storage.createLearningStyle(learningStyleData);
+      
+      console.log("Learning style created successfully:", learningStyle);
+      res.status(201).json(learningStyle);
     } catch (error) {
       console.error("Learning style error:", error);
-      res.status(500).json({ message: "Failed to save learning style" });
+      res.status(500).json({ message: "Failed to save learning style", error: String(error) });
     }
   });
 

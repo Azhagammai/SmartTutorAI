@@ -148,14 +148,27 @@ export default function AssessmentPage() {
       assessmentResults: answers
     });
     
+    // Convert assessmentResults to JSON string to ensure proper transmission
+    const assessmentResultsJSON = JSON.stringify(answers);
+    
     submitLearningStyleMutation.mutate({
       learningType: learningStyleResult,
       domain: selectedDomain,
       assessmentResults: answers
     }, {
+      onSuccess: () => {
+        console.log("Learning style saved successfully");
+        setCurrentStep(STEPS.COMPLETE);
+        
+        // Add a small delay before redirecting to dashboard
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 3000);
+      },
       onError: (error) => {
         console.error("Learning style submission error:", error);
         setIsSubmitting(false);
+        alert("There was an error saving your learning style. Please try again.");
       }
     });
   };
