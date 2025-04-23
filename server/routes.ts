@@ -334,63 +334,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid message data" });
       }
 
-      // Save user message
-      const userMessage = await storage.createAiTutorMessage(result.data);
-
       // Get user's learning style
       const learningStyle = await storage.getLearningStyle(req.user.id);
       
-      // Generate AI response
-      let aiResponseText = "I'm sorry, I couldn't process your request at the moment.";
-      
-      try {
-        // Get previous messages for context
-        const previousMessages = await storage.getAiTutorMessages(req.user.id);
-        const recentMessages = previousMessages.slice(-10); // Last 10 messages for context
-        
-        // Format messages for OpenAI
-        const formattedMessages = [
-          {
-            role: "system",
-            content: `You are Nova, an AI tutor specializing in ${learningStyle?.domain || 'education'}. 
-                     The student's learning style is ${learningStyle?.learningType || 'unknown'}.
-                     Provide helpful, concise responses to help the student learn.`
-          },
-          ...recentMessages.map(msg => ({
-            role: msg.isUserMessage ? "user" : "assistant",
-            content: msg.message
-          })),
-          {
-            role: "user",
-            content: result.data.message
-          }
-        ];
+      // Process message using our AI tutor implementation
+      const response = await processAiTutorMessage(
+        req.user.id,
+        result.data.message,
+        learningStyle?.domain,
+        learningStyle?.learningType
+      );
 
-        // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: formattedMessages as any,
-          max_tokens: 500,
-        });
-
-        aiResponseText = completion.choices[0].message.content || aiResponseText;
-      } catch (error) {
-        console.error("OpenAI API error:", error);
-        // Use fallback response if OpenAI fails
-      }
-
-      // Save AI response
-      const aiMessage = await storage.createAiTutorMessage({
-        userId: req.user.id,
-        message: aiResponseText,
-        isUserMessage: false
-      });
-
-      res.status(201).json({
-        userMessage,
-        aiMessage
-      });
+      res.status(201).json(response);
     } catch (error) {
+      console.error("AI Tutor error:", error);
       res.status(500).json({ message: "Failed to process message" });
     }
   });
