@@ -86,23 +86,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
+      console.log("Learning style request body:", req.body);
+
       const result = insertLearningStyleSchema.safeParse(req.body);
       if (!result.success) {
-        return res.status(400).json({ message: "Invalid learning style data" });
+        console.log("Learning style validation errors:", result.error);
+        return res.status(400).json({ 
+          message: "Invalid learning style data",
+          errors: result.error.format()
+        });
       }
 
       const existingStyle = await storage.getLearningStyle(req.user.id);
       if (existingStyle) {
+        console.log("Updating existing learning style for user:", req.user.id);
         const updatedStyle = await storage.updateLearningStyle(req.user.id, result.data);
         return res.json(updatedStyle);
       }
 
+      console.log("Creating new learning style for user:", req.user.id);
       const learningStyle = await storage.createLearningStyle({
         ...result.data,
         userId: req.user.id,
       });
       res.json(learningStyle);
     } catch (error) {
+      console.error("Learning style error:", error);
       res.status(500).json({ message: "Failed to save learning style" });
     }
   });

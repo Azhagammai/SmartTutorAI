@@ -29,10 +29,11 @@ export const learningStyles = pgTable("learning_styles", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertLearningStyleSchema = createInsertSchema(learningStyles).pick({
+export const insertLearningStyleSchema = createInsertSchema(learningStyles).omit({
+  id: true,
+  createdAt: true,
+}).partial({
   userId: true,
-  learningType: true,
-  domain: true,
   assessmentResults: true,
 });
 
