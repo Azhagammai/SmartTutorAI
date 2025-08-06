@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation } from 'wouter';
-import { LayoutDashboard, GraduationCap, MessageSquare, User as UserIcon } from 'lucide-react';
+import { LayoutDashboard, GraduationCap, MessageSquare, User as UserIcon, Trophy } from 'lucide-react';
 
 export default function MobileNavigation() {
   const [location] = useLocation();
@@ -9,6 +9,7 @@ export default function MobileNavigation() {
     if (path === '/dashboard' && location === '/dashboard') return true;
     if (path === '/learning-path' && location.includes('/learning-path')) return true;
     if (path === '/community' && location === '/community') return true;
+    if (path === '/achievements' && location === '/achievements') return true;
     if (path === '/profile' && location === '/profile') return true;
     return false;
   };

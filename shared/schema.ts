@@ -181,6 +181,36 @@ export type UserAchievement = typeof userAchievements.$inferSelect;
 export type InsertAiTutorMessage = z.infer<typeof insertAiTutorMessageSchema>;
 export type AiTutorMessage = typeof aiTutorMessages.$inferSelect;
 
+export type ResourceType = "video" | "article" | "tutorial" | "documentation" | "github" | "module";
+export type LearningLevel = "Beginner" | "Intermediate" | "Advanced" | "Expert";
+
+export interface UserStats {
+  completedResources: number;
+  studyHours: number;
+  lastActivityAt: Date;
+  totalProgress: number;
+  streakDays: number;
+  level: LearningLevel;
+  xp: number;
+}
+
+export interface Achievement {
+  type: string;
+  completedAt: Date;
+  xp: number;
+}
+
+export interface WatchedResource {
+  id: string;
+  title: string;
+  type: ResourceType;
+  domain: string;
+  platform: string;
+  duration?: number;
+  completedAt: string;
+  progress: number;
+}
+
 // Assessment question schema for front-end validation
 export const assessmentQuestionSchema = z.object({
   id: z.number(),

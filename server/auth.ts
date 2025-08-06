@@ -4,8 +4,9 @@ import { Express } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { storage } from "./storage";
+import User from "./user.model";
 import { User as SelectUser } from "@shared/schema";
+import mongoose from "mongoose";
 
 declare global {
   namespace Express {
@@ -33,10 +34,12 @@ export function setupAuth(app: Express) {
     secret: process.env.SESSION_SECRET || "your-secret-key",
     resave: false,
     saveUninitialized: false,
-    store: storage.sessionStore,
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-    }
+      httpOnly: true,
+      secure: false, // set to true if using HTTPS in production
+      sameSite: "lax", // or "none" if using HTTPS and cross-site
+    },
   };
 
   app.set("trust proxy", 1);
@@ -46,54 +49,66 @@ export function setupAuth(app: Express) {
 
   passport.use(
     new LocalStrategy(async (username, password, done) => {
-      const user = await storage.getUserByUsername(username);
-      if (!user || !(await comparePasswords(password, user.password))) {
-        return done(null, false);
-      } else {
-        return done(null, user);
+      try {
+        const user = await User.findOne({ username });
+        if (!user || !(await comparePasswords(password, user.password))) {
+          return done(null, false);
+        } else {
+          return done(null, user.toObject());
+        }
+      } catch (err) {
+        return done(err);
       }
-    }),
+    })
   );
 
-  passport.serializeUser((user, done) => done(null, user.id));
-  passport.deserializeUser(async (id: number, done) => {
-    const user = await storage.getUser(id);
-    done(null, user);
+  passport.serializeUser((user: any, done) => done(null, user._id));
+  passport.deserializeUser(async (id: string, done) => {
+    try {
+      const userDoc = await User.findById(id).lean();
+      if (!userDoc || Array.isArray(userDoc)) return done(null, false);
+      // Map MongoDB user fields to expected User shape
+      const mappedUser = {
+        id: 0, // dummy value for type compatibility
+        _id: userDoc._id, // use _id for MongoDB
+        username: userDoc.username,
+        password: userDoc.password,
+        fullName: userDoc.fullName,
+        email: userDoc.email,
+        createdAt: userDoc.createdAt || null,
+        progress: userDoc.progress || {},
+        currentCourse: userDoc.currentCourse || "",
+        certificates: userDoc.certificates || [],
+      };
+      done(null, mappedUser);
+    } catch (err) {
+      done(err);
+    }
   });
 
   app.post("/api/register", async (req, res, next) => {
     try {
       const { username, password, fullName, email } = req.body;
-      
-      // Validate input
       if (!username || !password || !fullName || !email) {
         return res.status(400).json({ message: "All fields are required" });
       }
-      
-      // Check if user already exists
-      const existingUser = await storage.getUserByUsername(username);
+      const existingUser = await User.findOne({ username });
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
       }
-      
-      const existingEmail = await storage.getUserByEmail(email);
+      const existingEmail = await User.findOne({ email });
       if (existingEmail) {
         return res.status(400).json({ message: "Email already exists" });
       }
-
-      // Create user
-      const user = await storage.createUser({
+      const user = await User.create({
         username,
         password: await hashPassword(password),
         fullName,
-        email
+        email,
       });
-
-      // Login the user
-      req.login(user, (err) => {
+      req.login(user.toObject(), (err: any) => {
         if (err) return next(err);
-        // Don't send the password back to the client
-        const { password, ...userWithoutPassword } = user;
+        const { password, ...userWithoutPassword } = user.toObject();
         res.status(201).json(userWithoutPassword);
       });
     } catch (error) {
@@ -102,14 +117,13 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
-    passport.authenticate("local", (err, user, info) => {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) return next(err);
       if (!user) {
         return res.status(401).json({ message: "Invalid username or password" });
       }
-      req.login(user, (err) => {
+      req.login(user, (err: any) => {
         if (err) return next(err);
-        // Don't send the password back to the client
         const { password, ...userWithoutPassword } = user;
         res.status(200).json(userWithoutPassword);
       });
@@ -124,8 +138,7 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    // Don't send the password back to the client
+    if (!req.isAuthenticated() || !req.user) return res.sendStatus(401);
     const { password, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);
   });

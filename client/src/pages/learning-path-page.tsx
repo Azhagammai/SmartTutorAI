@@ -5,14 +5,16 @@ import Header from "@/components/header";
 import Sidebar from "@/components/sidebar";
 import MobileNavigation from "@/components/mobile-navigation";
 import CourseCard from "@/components/course-card";
+import JourneyVisualization from "@/components/journey-visualization";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, BookOpen } from "lucide-react";
+import { Search, Filter, BookOpen, Map, Bot, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { motion } from "framer-motion";
+import AiAssistantButton from "@/components/ai-assistant-button";
 
 // Define interfaces for better type safety
 interface Course {
@@ -57,10 +59,13 @@ export default function LearningPathPage() {
   const [location] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
+  const [showJourneyView, setShowJourneyView] = useState(true);
   
   // Extract courseId from URL if present
   const urlParams = new URLSearchParams(location.split("?")[1]);
   const courseIdParam = urlParams.get("courseId");
+  const viewParam = urlParams.get("view");
+  const showRecommended = viewParam === "recommended";
   
   // Fetch learning style
   const { data: learningStyle } = useQuery<LearningStyle>({
@@ -80,11 +85,18 @@ export default function LearningPathPage() {
     enabled: !!user,
   });
   
-  // Filter courses based on search and filter selection
+  // Filter courses based on search, filter selection, and view mode
   const filteredCourses = courses?.filter((course: Course) => {
     const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       course.description.toLowerCase().includes(searchQuery.toLowerCase());
     
+    if (showRecommended && learningStyle) {
+      // Show courses in the user's domain that match their level
+      const progress = allProgress?.find((p: Progress) => p.courseId === course.id);
+      const isAppropriateLevel = !progress || (!progress.completed && progress.progress < 100);
+      return matchesSearch && course.domain === learningStyle.domain && isAppropriateLevel;
+    }
+
     if (selectedFilter === "all") return matchesSearch;
     if (selectedFilter === "my-domain" && learningStyle) {
       return matchesSearch && course.domain === learningStyle.domain;
@@ -104,14 +116,48 @@ export default function LearningPathPage() {
     return matchesSearch;
   });
 
-  // Render course detail view
+  // Prepare courses for journey visualization
+  const journeyCourses = React.useMemo(() => {
+    if (!courses || !allProgress || !learningStyle) return [];
+    
+    // Filter courses by domain and sort by difficulty
+    const domainCourses = courses
+      .filter(course => course.domain === learningStyle.domain)
+      .sort((a, b) => {
+        const difficultyOrder = { beginner: 1, intermediate: 2, advanced: 3 };
+        return difficultyOrder[a.difficulty as keyof typeof difficultyOrder] - 
+               difficultyOrder[b.difficulty as keyof typeof difficultyOrder];
+      });
+
+    // Find the current course
+    const currentProgress = allProgress.find(p => p.progress > 0 && !p.completed);
+    const currentCourseId = currentProgress?.courseId;
+
+    // Map courses to journey visualization format
+    return domainCourses.map((course, index) => {
+      const progress = allProgress.find(p => p.courseId === course.id);
+      const previousCourse = index > 0 ? domainCourses[index - 1] : null;
+      const previousProgress = previousCourse 
+        ? allProgress.find(p => p.courseId === previousCourse.id)
+        : null;
+      
+      return {
+        id: course.id,
+        title: course.title,
+        difficulty: course.difficulty,
+        isCompleted: progress?.completed || false,
+        isLocked: previousCourse ? !(previousProgress?.completed) : false,
+        progress: progress?.progress || 0
+      };
+    });
+  }, [courses, allProgress, learningStyle]);
+
+  // Render course detail view (Coursera-like)
   const renderCourseDetail = () => {
     if (!courseIdParam || !courses) return null;
-    
     const courseId = parseInt(courseIdParam);
     const course = courses.find((c: Course) => c.id === courseId);
     const progress = allProgress?.find((p: Progress) => p.courseId === courseId) || { progress: 0, completed: false, currentModuleId: undefined };
-    
     if (!course) {
       return (
         <div className="text-center py-10">
@@ -124,186 +170,117 @@ export default function LearningPathPage() {
         </div>
       );
     }
-    
     // Fetch modules for this course
     const { data: modules, isLoading: isLoadingModules } = useQuery<Module[]>({
       queryKey: [`/api/courses/${courseId}/modules`],
       enabled: !!courseId,
     });
-    
+    // Persistent state for current module selection
+    const [selectedModuleId, setSelectedModuleId] = React.useState<number | undefined>(undefined);
+    React.useEffect(() => {
+      if (progress.currentModuleId) {
+        setSelectedModuleId(progress.currentModuleId);
+      } else if (modules && modules.length > 0) {
+        setSelectedModuleId(modules[0].id);
+      }
+    }, [progress.currentModuleId, modules]);
+    // Find current module
+    const sortedModules = modules ? [...modules].sort((a, b) => a.order - b.order) : [];
+    const currentModule = sortedModules.find((m) => m.id === selectedModuleId) || sortedModules[0];
+    // Calculate unlocked modules (Coursera: can only access up to current+1)
+    let unlockedIdx = 0;
+    if (progress.progress > 0 && sortedModules.length > 0) {
+      unlockedIdx = Math.max(0, Math.ceil((progress.progress / 100) * sortedModules.length));
+    }
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row gap-6">
-          <div className="md:w-2/3 space-y-4">
-            <Card>
-              <div className="relative aspect-video w-full overflow-hidden rounded-t-lg">
-                <img 
-                  src={course.thumbnail || "https://cdn.pixabay.com/photo/2018/06/08/00/48/developer-3461405_1280.png"} 
-                  alt={course.title}
-                  className="w-full h-full object-cover"
-                />
+      <div className="flex flex-col md:flex-row gap-8">
+        {/* Sidebar: Module Navigation */}
+        <aside className="md:w-1/4 w-full mb-6 md:mb-0">
+          <Card className="sticky top-24">
+            <CardHeader>
+              <CardTitle className="text-base">Course Modules</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoadingModules ? (
+                <div className="flex justify-center py-6">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+              ) : !sortedModules.length ? (
+                <p className="text-gray-500 py-4">No modules available for this course yet.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {sortedModules.map((module, idx) => {
+                    const isCurrent = selectedModuleId === module.id;
+                    const isUnlocked = idx <= unlockedIdx;
+                    const isCompleted = progress.progress > 0 && idx + 1 <= unlockedIdx;
+                    return (
+                      <li key={module.id}>
+                        <button
+                          className={`w-full text-left px-3 py-2 rounded transition-colors flex items-center justify-between ${isCurrent ? 'bg-primary-50 text-primary font-semibold' : 'hover:bg-gray-50 text-gray-700'} ${!isUnlocked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                          onClick={() => isUnlocked && setSelectedModuleId(module.id)}
+                          disabled={!isUnlocked}
+                          aria-current={isCurrent ? 'step' : undefined}
+                        >
+                          <span>
+                            Module {module.order}: {module.title}
+                          </span>
+                          {isCurrent && <Badge variant="secondary" className="ml-2">Current</Badge>}
+                          {isCompleted && <span className="ml-2 text-green-600 text-xs">✓</span>}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </aside>
+        {/* Main Content: Current Module */}
+        <section className="flex-1 min-w-0">
+          <div className="mb-6">
+            <Button variant="outline" onClick={() => window.location.href = "/learning-path"} className="flex items-center mb-2">
+              <span className="mr-2">←</span> Back to courses
+            </Button>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">{course.title}</h1>
+            <div className="flex items-center text-sm text-gray-500 mb-2">
+              <span className="capitalize">{course.difficulty}</span>
+              <span className="mx-2">•</span>
+              <span>{course.estimatedDuration}</span>
+            </div>
+            <p className="text-gray-700 mb-2">{course.description}</p>
+            {progress.progress > 0 && (
+              <div className="w-full bg-gray-200 rounded-full h-2.5 my-2">
+                <div 
+                  className="bg-primary h-2.5 rounded-full" 
+                  style={{ width: `${progress.progress}%` }}
+                ></div>
               </div>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <CardTitle className="text-2xl">{course.title}</CardTitle>
-                </div>
-                <div className="flex items-center text-sm text-gray-500 mt-1">
-                  <span className="capitalize">{course.difficulty}</span>
-                  <span className="mx-2">•</span>
-                  <span>{course.estimatedDuration}</span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <h3 className="text-lg font-semibold mb-2">About this course</h3>
-                <p className="text-gray-700">{course.description}</p>
-                
-                {progress.progress > 0 && (
-                  <div className="mt-6">
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
-                      <div 
-                        className="bg-primary h-2.5 rounded-full" 
-                        style={{ width: `${progress.progress}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between mt-2 text-sm text-gray-600">
-                      <span>{progress.progress}% complete</span>
-                      {progress.completed ? 
-                        <span className="text-green-600 font-medium">Completed</span> : 
-                        <span>{Math.round(progress.progress * 0.01 * (modules?.length || 0))} / {modules?.length || 0} modules</span>
-                      }
-                    </div>
-                  </div>
-                )}
-                
-                <div className="mt-6">
-                  <Button 
-                    size="lg" 
-                    className="w-full"
-                    onClick={() => {
-                      if (!progress.progress) {
-                        // Get first module
-                        if (modules && modules.length > 0) {
-                          const firstModule = modules.sort((a: Module, b: Module) => a.order - b.order)[0];
-                          
-                          // Create initial progress
-                          fetch(`/api/progress/${courseId}`, {
-                            method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                              progress: 5,
-                              currentModuleId: firstModule.id,
-                              completed: false
-                            })
-                          })
-                          .then(res => res.json())
-                          .then(() => {
-                            window.location.reload();
-                          })
-                          .catch(err => console.error('Error creating progress:', err));
-                        }
-                      }
-                    }}
-                  >
-                    {progress.progress > 0 ? "Continue Learning" : "Start Learning"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Module List */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Course Content</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoadingModules ? (
-                  <div className="flex justify-center py-6">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : !modules || modules.length === 0 ? (
-                  <p className="text-gray-500 py-4">No modules available for this course yet.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {modules.map((module: Module, index: number) => (
-                      <div 
-                        key={module.id} 
-                        className="p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <span className="text-sm text-gray-500">Module {index + 1}</span>
-                            <h4 className="font-medium">{module.title}</h4>
-                          </div>
-                          <Button variant="outline" size="sm" onClick={() => {
-                            // Create or update progress when starting a module
-                            if (!progress.progress) {
-                              fetch(`/api/progress/${courseId}`, {
-                                method: 'POST',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                  progress: 10,
-                                  currentModuleId: module.id,
-                                  completed: false
-                                })
-                              })
-                              .then(res => res.json())
-                              .then(() => {
-                                window.location.reload();
-                              })
-                              .catch(err => console.error('Error updating progress:', err));
-                            }
-                          }}>
-                            {progress.currentModuleId === module.id ? "Continue" : "Start"}
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-          
-          <div className="md:w-1/3 space-y-4">
-            {/* AI Tutor Card */}
-            <div className="bg-white p-5 rounded-lg shadow border border-gray-200">
-              <h3 className="text-lg font-semibold mb-3">Need Help?</h3>
-              <p className="text-gray-600 mb-4">
-                Get personalized assistance with Nova, your AI tutor tailored to your learning style.
-              </p>
-              <Button asChild variant="outline" className="w-full">
-                <a href={`/ai-tutor?domain=${course.domain}`}>Chat with Nova</a>
-              </Button>
-            </div>
-            
-            {/* Related Courses */}
-            <div className="bg-white p-5 rounded-lg shadow border border-gray-200">
-              <h3 className="text-lg font-semibold mb-3">Related Courses</h3>
-              {courses
-                .filter((c: Course) => c.domain === course.domain && c.id !== course.id)
-                .slice(0, 3)
-                .map((relatedCourse: Course) => (
-                  <div key={relatedCourse.id} className="mb-4 last:mb-0">
-                    <h4 className="font-medium text-sm">{relatedCourse.title}</h4>
-                    <p className="text-xs text-gray-500 mb-2">{relatedCourse.difficulty} • {relatedCourse.estimatedDuration}</p>
-                    <Button variant="link" asChild className="h-auto p-0 text-sm">
-                      <a href={`/learning-path?courseId=${relatedCourse.id}`}>View Course</a>
-                    </Button>
-                  </div>
-                ))
-              }
+            )}
+            <div className="flex justify-between text-xs text-gray-600">
+              <span>{progress.progress}% complete</span>
+              {progress.completed ? <span className="text-green-600 font-medium">Completed</span> : null}
             </div>
           </div>
-        </div>
+          {/* Show CourseCard for current module */}
+          {currentModule && (
+            <CourseCard 
+              course={course} 
+              progress={{
+                id: ("id" in progress && typeof progress.id === "number") ? progress.id : 0,
+                userId: ("userId" in progress && typeof progress.userId === "number") ? progress.userId : 0,
+                courseId: course.id,
+                progress: progress.progress,
+                completed: progress.completed,
+                currentModuleId: currentModule.id
+              }}
+            />
+          )}
+        </section>
       </div>
     );
   };
   
-  // Render course list
+  // Render course list with prerequisites and learning style info
   const renderCourseList = () => {
     if (isLoadingCourses) {
       return (
@@ -327,6 +304,7 @@ export default function LearningPathPage() {
       <>
         {filteredCourses.map((course: Course, index: number) => {
           const progress = allProgress?.find((p: Progress) => p.courseId === course.id) || { progress: 0, completed: false, currentModuleId: undefined };
+          const isRecommended = showRecommended && (!progress || (!progress.completed && progress.progress < 100));
           
           return (
             <motion.div 
@@ -336,7 +314,7 @@ export default function LearningPathPage() {
               transition={{ duration: 0.3, delay: index * 0.1 }}
               className="col-span-1"
             >
-              <Card className="h-full flex flex-col">
+              <Card className={`h-full flex flex-col ${isRecommended ? 'ring-2 ring-primary ring-opacity-50' : ''}`}>
                 <div className="relative aspect-video w-full overflow-hidden rounded-t-lg">
                   <img 
                     src={course.thumbnail || "https://cdn.pixabay.com/photo/2018/06/08/00/48/developer-3461405_1280.png"} 
@@ -353,15 +331,26 @@ export default function LearningPathPage() {
                       <Badge variant="secondary">In Progress</Badge>
                     </div>
                   )}
+                  {isRecommended && (
+                    <div className="absolute top-2 left-2">
+                      <Badge variant="secondary" className="bg-primary text-white">Recommended</Badge>
+                    </div>
+                  )}
                 </div>
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-lg">{course.title}</CardTitle>
                   </div>
-                  <div className="flex items-center text-xs text-gray-500 mt-1">
+                  <div className="flex items-center text-xs text-gray-500 mt-1 space-x-2">
                     <span className="capitalize">{course.difficulty}</span>
-                    <span className="mx-2">•</span>
+                    <span>•</span>
                     <span>{course.estimatedDuration}</span>
+                    {learningStyle?.learningType && (
+                      <>
+                        <span>•</span>
+                        <span className="text-primary">{learningStyle.learningType} optimized</span>
+                      </>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col">
@@ -381,7 +370,12 @@ export default function LearningPathPage() {
                     </div>
                   )}
                   
-                  <div className="mt-4">
+                  <div className="mt-4 space-y-2">
+                    {showRecommended && (
+                      <div className="text-sm text-gray-600 bg-primary/5 p-2 rounded">
+                        <span className="font-medium">Why this course?</span> Perfect for your {learningStyle?.learningType} learning style with {course.difficulty} content.
+                      </div>
+                    )}
                     <Button asChild className="w-full">
                       <a href={`/learning-path?courseId=${course.id}`}>
                         {progress.progress > 0 ? "Continue Course" : "Start Course"}
@@ -397,8 +391,9 @@ export default function LearningPathPage() {
     );
   };
 
+  // Render the main content
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-50 to-white">
       <Header />
       
       <div className="flex-1 flex">
@@ -417,14 +412,85 @@ export default function LearningPathPage() {
               {renderCourseDetail()}
             </div>
           ) : (
-            // Show course list view
+            // Show learning path view
             <div className="space-y-6">
-              {/* Header */}
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Learning Path</h1>
-                <p className="text-gray-500">Explore courses tailored to your learning style</p>
+              {/* AI Learning Path Recommendations */}
+              <div className="bg-white/80 backdrop-blur-lg shadow-lg rounded-2xl overflow-hidden border border-white/20">
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h1 className="text-2xl font-bold text-gray-900">Your Learning Path</h1>
+                      <p className="text-gray-600">AI-personalized course recommendations for your journey</p>
+                    </div>
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <Bot className="h-4 w-4" />
+                      Get Path Suggestions
+                    </Button>
+                  </div>
+                  
+                  <div className="bg-primary/5 rounded-lg p-4 flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Sparkles className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">AI Learning Insights</h3>
+                      <p className="text-sm text-gray-600">
+                        Based on your {learningStyle?.learningType} learning style, here are personalized course recommendations in {learningStyle?.domain}.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              
+
+              {/* Header with learning style info */}
+              <div>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">
+                      {showRecommended ? "Your Learning Journey" : "Learning Path"}
+                    </h1>
+                    {learningStyle && (
+                      <p className="text-gray-500 mt-1">
+                        Courses {showRecommended ? "recommended" : ""} for {learningStyle.domain} with {learningStyle.learningType} learning style
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="flex items-center space-x-2"
+                    onClick={() => setShowJourneyView(!showJourneyView)}
+                  >
+                    <Map className="w-4 h-4" />
+                    <span>{showJourneyView ? "Grid View" : "Journey View"}</span>
+                  </Button>
+                </div>
+              </div>
+
+              {showRecommended && learningStyle && (
+                <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-6">
+                  <h3 className="text-lg font-medium text-blue-900 mb-2">Your Personalized Learning Journey</h3>
+                  <p className="text-blue-700">
+                    Based on your {learningStyle.learningType} learning style, we've crafted an optimized path through {learningStyle.domain}.
+                    The journey below represents your progression from beginner to expert, with each milestone building upon previous knowledge.
+                  </p>
+                </div>
+              )}
+
+              {/* Journey Visualization */}
+              {showJourneyView && journeyCourses.length > 0 && (
+                <Card className="mb-6">
+                  <CardHeader>
+                    <CardTitle>Your Learning Journey Map</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <JourneyVisualization 
+                      courses={journeyCourses}
+                      currentCourseId={allProgress?.find(p => p.progress > 0 && !p.completed)?.courseId}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Search and Filters */}
               <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                 <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0 md:space-x-4">
@@ -440,30 +506,51 @@ export default function LearningPathPage() {
                     />
                   </div>
                   
-                  <div className="flex items-center space-x-2">
-                    <Filter className="h-5 w-5 text-gray-400" />
-                    <select
-                      className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 p-2"
-                      value={selectedFilter}
-                      onChange={(e) => setSelectedFilter(e.target.value)}
-                    >
-                      <option value="all">All Courses</option>
-                      <option value="my-domain">My Domain ({learningStyle?.domain})</option>
-                      <option value="in-progress">In Progress</option>
-                      <option value="completed">Completed</option>
-                    </select>
-                  </div>
+                  {!showRecommended && (
+                    <div className="flex items-center space-x-2">
+                      <Filter className="h-5 w-5 text-gray-400" />
+                      <select
+                        className="bg-white border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-500 focus:border-primary-500 p-2"
+                        value={selectedFilter}
+                        onChange={(e) => setSelectedFilter(e.target.value)}
+                      >
+                        <option value="all">All Courses</option>
+                        <option value="my-domain">My Domain ({learningStyle?.domain})</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <Button 
+                    variant={showRecommended ? "default" : "outline"}
+                    onClick={() => {
+                      if (showRecommended) {
+                        window.location.href = "/learning-path";
+                      } else {
+                        window.location.href = "/learning-path?view=recommended";
+                      }
+                    }}
+                  >
+                    {showRecommended ? "View All Courses" : "View Recommended"}
+                  </Button>
                 </div>
               </div>
-              
+
               {/* Course Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className={showJourneyView ? "" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"}>
                 {renderCourseList()}
               </div>
             </div>
           )}
         </main>
       </div>
+      
+      {/* AI Assistant */}
+      <AiAssistantButton 
+        domain={learningStyle?.domain}
+        learningStyle={learningStyle?.learningType}
+      />
       
       <MobileNavigation />
     </div>

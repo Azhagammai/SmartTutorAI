@@ -1,24 +1,16 @@
 import { AiTutorMessage, InsertAiTutorMessage } from "@shared/schema";
 import { storage } from "./storage";
 import OpenAI from 'openai';
-import dotenv from 'dotenv';
 
-// Load environment variables
-dotenv.config();
-
-const apiKey = process.env.OPENROUTER_API_KEY;
-if (!apiKey) {
-  throw new Error('OPENROUTER_API_KEY environment variable is not set');
-}
-
-// Initialize OpenAI client with OpenRouter configuration for LLM
+// Initialize OpenAI client with OpenRouter configuration for Gemini
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
-  apiKey: apiKey,
+  apiKey: process.env.OPENROUTER_API_KEY || "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",
   defaultHeaders: {
     "HTTP-Referer": "https://smarttutorai.com",
-    "X-Title": "SmartTutorAI - Nova"
-  }
+    "X-Title": "SmartTutorAI - Nova",
+    "OpenRouter-Model-Preferred": "google/gemini-pro" // Force Gemini Pro model
+  },
 });
 
 // Interface for chat messages
@@ -37,11 +29,11 @@ const activeSessions = new Map<number, ChatSession>();
 
 // Generate system prompt for the AI tutor
 function generatePrompt(domain?: string, learningStyle?: string): string {
-  let prompt = "You are Nova, an advanced AI tutor. ";
-  prompt += "You specialize in providing detailed, interactive learning experiences. Keep responses focused and to the point. ";
+  let prompt = "You are Nova, an advanced AI tutor powered by Gemini. ";
+  prompt += "You specialize in providing detailed, interactive learning experiences. ";
   
   if (domain) {
-    prompt += `You are teaching ${domain}. Provide clear explanations with examples and real applications. Your responses should be helpful but concise. `;
+    prompt += `You are teaching ${domain}. Provide clear explanations with examples and real applications. `;
   }
   
   if (learningStyle) {
@@ -78,25 +70,25 @@ async function getChatSession(
     
     // Initialize chat with system prompt
     const completion = await openai.chat.completions.create({
-      model: "openai/gpt-3.5-turbo", // Use GPT-3.5 as it's widely available on OpenRouter
+      model: "google/gemini-pro",
       messages: [
         { role: "system", content: systemPrompt }
       ],
-      temperature: 0.5,
+      temperature: 0.7,
       max_tokens: 2048,
-      top_p: 0.9,
-      frequency_penalty: 0.2
+      top_p: 0.95,
+      frequency_penalty: 0.5,
+      presence_penalty: 0.5
     });
-
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('No response generated');
-    }
 
     session = {
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "assistant", content }
+        { 
+          role: "assistant", 
+          content: completion.choices[0]?.message?.content || 
+                   "Hello! I'm Nova, your AI tutor. What would you like to learn about?"
+        }
       ]
     };
     
@@ -125,12 +117,12 @@ export async function processAiTutorMessage(
 
     // Generate AI response
     const completion = await openai.chat.completions.create({
-      model: "openai/gpt-3.5-turbo", // Use GPT-3.5 as it's widely available on OpenRouter
+      model: "google/gemini-pro",
       messages: session.messages,
-      temperature: 0.5,
+      temperature: 0.7,
       max_tokens: 2048,
-      top_p: 0.9,
-      frequency_penalty: 0.2
+      top_p: 0.95,
+      frequency_penalty: 0.3
     });
 
     const aiResponse = completion.choices[0]?.message?.content;

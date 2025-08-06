@@ -12,7 +12,9 @@ import {
   User as UserIcon,
   ChevronRight,
   ChevronLeft,
-  BookOpen
+  BookOpen,
+  Layers,
+  TrendingUp
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -40,6 +42,12 @@ export default function Sidebar() {
       active: location.includes("/learning-path")
     },
     {
+      title: "Learning Progress",
+      icon: <TrendingUp className="h-5 w-5" />,
+      href: "/learning-progress",
+      active: location === "/learning-progress"
+    },
+    {
       title: "Community",
       icon: <MessageSquare className="h-5 w-5" />,
       href: "/community",
@@ -47,7 +55,7 @@ export default function Sidebar() {
     },
     {
       title: "Resources",
-      icon: <BookOpen className="h-5 w-5" />,
+      icon: <Layers className="h-5 w-5" />,
       href: "/resources",
       active: location === "/resources"
     },

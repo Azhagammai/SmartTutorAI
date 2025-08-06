@@ -1,4 +1,4 @@
-import { users, type User, type InsertUser, type LearningStyle, type InsertLearningStyle, type Course, type InsertCourse, type Module, type InsertModule, type Quiz, type InsertQuiz, type UserProgress, type InsertUserProgress, type ForumDiscussion, type InsertForumDiscussion, type ForumReply, type InsertForumReply, type UserAchievement, type InsertUserAchievement, type AiTutorMessage, type InsertAiTutorMessage } from "@shared/schema";
+import { users, type User, type InsertUser, type LearningStyle, type InsertLearningStyle, type Course, type InsertCourse, type Module, type InsertModule, type Quiz, type InsertQuiz, type UserProgress, type InsertUserProgress, type ForumDiscussion, type InsertForumDiscussion, type ForumReply, type InsertForumReply, type UserAchievement, type InsertUserAchievement, type AiTutorMessage, type InsertAiTutorMessage, type UserStats, type Achievement, type WatchedResource, type LearningLevel, type ResourceType } from "@shared/schema";
 import createMemoryStore from "memorystore";
 import session from "express-session";
 
@@ -54,8 +54,44 @@ export interface IStorage {
   getAiTutorMessages(userId: number): Promise<AiTutorMessage[]>;
   createAiTutorMessage(message: InsertAiTutorMessage): Promise<AiTutorMessage>;
 
+  // User Stats methods
+  getUserStats(userId: number): Promise<UserStats | undefined>;
+  updateUserStats(userId: number, stats: UserStats): Promise<UserStats>;
+
+  // Achievements methods
+  addAchievement(userId: number, achievement: Achievement): Promise<void>;
+  getAchievements(userId: number): Promise<Achievement[]>;
+
+  // Watched Resources methods
+  getWatchedResources(userId: number): Promise<WatchedResource[]>;
+  addWatchedResource(userId: number, resource: WatchedResource): Promise<void>;
+
   // Session store
   sessionStore: session.SessionStore;
+}
+
+// Define UserStats and Achievement interfaces
+interface UserStats {
+  completedResources: number;
+  studyHours: number;
+  lastActivityAt: Date;
+  totalProgress: number;
+  streakDays: number;
+  level: string;
+  xp: number;
+}
+
+interface Achievement {
+  type: string;
+  completedAt: Date;
+  xp: number;
+}
+
+interface WatchedResource {
+  userId: number;
+  resourceId: number;
+  resourceType: ResourceType;
+  watchedAt: Date;
 }
 
 // Implement Memory Storage
@@ -70,7 +106,10 @@ export class MemStorage implements IStorage {
   private forumReplies: Map<number, ForumReply>;
   private userAchievements: Map<number, UserAchievement>;
   private aiTutorMessages: Map<number, AiTutorMessage>;
-  
+  private userStats: Map<number, UserStats>;
+  private achievements: Map<number, Achievement[]>;
+  private watchedResources: Map<number, WatchedResource[]>;
+
   sessionStore: session.SessionStore;
   currentId: {
     users: number;
@@ -96,6 +135,9 @@ export class MemStorage implements IStorage {
     this.forumReplies = new Map();
     this.userAchievements = new Map();
     this.aiTutorMessages = new Map();
+    this.userStats = new Map();
+    this.achievements = new Map();
+    this.watchedResources = new Map();
     
     this.currentId = {
       users: 1,
@@ -433,6 +475,57 @@ export class MemStorage implements IStorage {
     const newMessage: AiTutorMessage = { ...message, id, createdAt };
     this.aiTutorMessages.set(id, newMessage);
     return newMessage;
+  }
+
+  // User Stats methods
+  async getUserStats(userId: number): Promise<UserStats | undefined> {
+    if (!this.userStats.has(userId)) {
+      // Initialize default stats if none exist
+      const defaultStats: UserStats = {
+        userId,
+        completedResources: 0,
+        studyHours: 0,
+        lastActivityAt: new Date(),
+        totalProgress: 0,
+        streakDays: 0,
+        level: "Beginner",
+        xp: 0
+      };
+      this.userStats.set(userId, defaultStats);
+      return defaultStats;
+    }
+    return this.userStats.get(userId);
+  }
+
+  async updateUserStats(userId: number, stats: Partial<UserStats>): Promise<UserStats> {
+    const existingStats = await this.getUserStats(userId);
+    const updatedStats = { ...existingStats, ...stats } as UserStats;
+    this.userStats.set(userId, updatedStats);
+    return updatedStats;
+  }
+
+  // Achievements methods
+  async addAchievement(userId: number, achievement: Achievement): Promise<void> {
+    const userAchievements = await this.getAchievements(userId);
+    if (!userAchievements.some(a => a.type === achievement.type)) {
+      userAchievements.push(achievement);
+      this.achievements.set(userId, userAchievements);
+    }
+  }
+
+  async getAchievements(userId: number): Promise<Achievement[]> {
+    return this.achievements.get(userId) || [];
+  }
+
+  // Watched Resources methods
+  async getWatchedResources(userId: number): Promise<WatchedResource[]> {
+    return this.watchedResources.get(userId) || [];
+  }
+
+  async addWatchedResource(userId: number, resource: WatchedResource): Promise<void> {
+    const resources = await this.getWatchedResources(userId);
+    resources.push(resource);
+    this.watchedResources.set(userId, resources);
   }
 }
 

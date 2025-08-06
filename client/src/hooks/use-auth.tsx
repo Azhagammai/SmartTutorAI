@@ -72,8 +72,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/api/user"], user);
       toast({
         title: "Registration successful",
-        description: `Welcome to EduSmart, ${user.fullName}!`,
+        description: "Welcome! Let's start by understanding your learning style.",
+        duration: 5000,
       });
+      // Redirect to assessment page after a short delay
+      setTimeout(() => {
+        window.location.href = "/assessment?newUser=true";
+      }, 1500);
     },
     onError: (error: Error) => {
       toast({

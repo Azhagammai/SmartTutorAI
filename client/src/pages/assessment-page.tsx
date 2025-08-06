@@ -11,8 +11,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import LearningStyleCard from "@/components/learning-style-card";
-import { School, CheckCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { School, CheckCircle, ChevronLeft, ChevronRight, Bot, Brain, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
+import AiAssistantButton from "@/components/ai-assistant-button";
 
 // Assessment steps
 const STEPS = {
@@ -44,9 +45,13 @@ interface Domain {
 
 export default function AssessmentPage() {
   const { user } = useAuth();
+  const [step, setStep] = useState(STEPS.WELCOME);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [learningStyle, setLearningStyle] = useState<string | null>(null);
+  const [domain, setDomain] = useState<string | null>(null);
+
   const [currentStep, setCurrentStep] = useState(STEPS.WELCOME);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
   const [learningStyleResult, setLearningStyleResult] = useState<string>("");
   const [selectedDomain, setSelectedDomain] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,8 +94,14 @@ export default function AssessmentPage() {
     }
   }, [existingLearningStyle, isLoadingLearningStyle]);
 
+  // Handle navigation based on user state and assessment completion
+  if (!user) {
+    return <Redirect to="/auth" />;
+  }
+
   // If the user has already completed assessment, redirect to dashboard
-  if (existingLearningStyle && !isLoadingLearningStyle) {
+  // But don't redirect if they just registered (check URL for a specific parameter)
+  if (existingLearningStyle && !isLoadingLearningStyle && !window.location.search.includes('newUser=true')) {
     return <Redirect to="/dashboard" />;
   }
 
@@ -264,16 +275,36 @@ export default function AssessmentPage() {
 
   // Render the welcome step
   const renderWelcome = () => {
+    const isNewUser = window.location.search.includes('newUser=true');
     return (
       <div className="text-center">
         <div className="mx-auto bg-primary-50 rounded-full w-20 h-20 flex items-center justify-center mb-6">
           <School className="h-10 w-10 text-primary" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Welcome to the Learning Style Assessment</h2>
-        <p className="text-gray-600 mb-8 max-w-md mx-auto">
-          Answer a few questions to help us understand how you learn best, and we'll create a personalized learning path just for you.
-        </p>
-        <Button size="lg" onClick={handleNext}>Start Assessment</Button>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-4"
+        >
+          {isNewUser ? (
+            <h2 className="text-2xl font-bold text-gray-900">
+              Welcome to EduSmart, {user?.fullName?.split(' ')[0]}! 👋
+            </h2>
+          ) : (
+            <h2 className="text-2xl font-bold text-gray-900">
+              Learning Style Assessment
+            </h2>
+          )}
+          <p className="text-gray-600 mb-8 max-w-md mx-auto">
+            {isNewUser 
+              ? "Let's start by understanding how you learn best. This will help us create a personalized learning experience just for you."
+              : "Answer a few questions to help us understand how you learn best, and we'll create a personalized learning path for you."
+            }
+          </p>
+          <Button size="lg" onClick={handleNext} className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary">
+            {isNewUser ? "Let's Get Started" : "Start Assessment"}
+          </Button>
+        </motion.div>
       </div>
     );
   };
@@ -300,37 +331,94 @@ export default function AssessmentPage() {
     const domainName = selectedDomainObj?.name || selectedDomain;
     
     return (
-      <div className="text-center">
-        <div className="mx-auto bg-green-50 rounded-full w-20 h-20 flex items-center justify-center mb-6">
+      <motion.div 
+        className="text-center"
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        <motion.div 
+          className="mx-auto bg-green-50 rounded-full w-20 h-20 flex items-center justify-center mb-6"
+          initial={{ scale: 0.5, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", duration: 0.8, bounce: 0.4 }}
+        >
           <CheckCircle className="h-10 w-10 text-green-500" />
-        </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Assessment Complete!</h2>
-        <p className="text-gray-600 mb-8 max-w-md mx-auto">
-          We've created your personalized learning path based on your {learningStyleResult} learning style and interest in {domainName}.
-        </p>
-        <Button size="lg" asChild>
-          <a href="/dashboard">Go to Dashboard</a>
-        </Button>
-      </div>
+        </motion.div>
+        
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="space-y-6"
+        >
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Profile Created Successfully! 🎉</h2>
+            <p className="text-gray-600 max-w-md mx-auto">
+              We've analyzed your responses and created a personalized learning experience just for you.
+            </p>
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-6 max-w-md mx-auto">
+            <h3 className="font-medium text-gray-900 mb-4">Your Learning Profile</h3>
+            <div className="space-y-3 text-left">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-primary" />
+                <span className="text-sm">Learning Style: <span className="font-medium capitalize">{learningStyleResult}</span></span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-primary" />
+                <span className="text-sm">Primary Domain: <span className="font-medium">{domainName}</span></span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-primary" />
+                <span className="text-sm">Personalized Path: <span className="font-medium">Ready</span></span>
+              </div>
+            </div>
+          </div>
+
+          <Button 
+            size="lg" 
+            asChild
+            className="bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary"
+          >
+            <a href="/dashboard">Go to Your Dashboard</a>
+          </Button>
+        </motion.div>
+      </motion.div>
     );
   };
 
   // Main content based on current step
   const renderContent = () => {
-    switch (currentStep) {
-      case STEPS.WELCOME:
-        return renderWelcome();
-      case STEPS.QUESTIONS:
-        return renderQuestion();
-      case STEPS.LEARNING_STYLE:
-        return renderLearningStyle();
-      case STEPS.DOMAINS:
-        return renderDomains();
-      case STEPS.COMPLETE:
-        return renderComplete();
-      default:
-        return null;
-    }
+    const content = (() => {
+      switch (currentStep) {
+        case STEPS.WELCOME:
+          return renderWelcome();
+        case STEPS.QUESTIONS:
+          return renderQuestion();
+        case STEPS.LEARNING_STYLE:
+          return renderLearningStyle();
+        case STEPS.DOMAINS:
+          return renderDomains();
+        case STEPS.COMPLETE:
+          return renderComplete();
+        default:
+          return null;
+      }
+    })();
+
+    return (
+      <motion.div
+        key={currentStep}
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        transition={{ duration: 0.3 }}
+      >
+        {content}
+      </motion.div>
+    );
   };
 
   // Render navigation buttons
@@ -382,22 +470,99 @@ export default function AssessmentPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-gray-50 to-white">
+      <Header hideMenu />
       
-      <main className="max-w-3xl mx-auto px-4 py-12">
-        <motion.div 
-          className="bg-white rounded-lg shadow-lg overflow-hidden"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <div className="p-8">
+      <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* AI-Enhanced Assessment Process */}
+        <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-lg">
+          <CardHeader className="text-center pb-3">
+            <div className="mx-auto h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <Brain className="h-6 w-6 text-primary" />
+            </div>
+            <CardTitle className="text-2xl font-bold">AI Learning Style Assessment</CardTitle>
+            
+            {/* Progress Steps */}
+            {currentStep !== STEPS.WELCOME && currentStep !== STEPS.COMPLETE && (
+              <div className="flex items-center justify-center gap-2 mt-4">
+                <div className={`h-2 w-2 rounded-full ${currentStep === STEPS.QUESTIONS ? 'bg-primary animate-pulse' : 'bg-primary'}`} />
+                <div className={`h-2 w-2 rounded-full ${currentStep === STEPS.LEARNING_STYLE ? 'bg-primary animate-pulse' : currentStep === STEPS.QUESTIONS ? 'bg-gray-200' : 'bg-primary'}`} />
+                <div className={`h-2 w-2 rounded-full ${currentStep === STEPS.DOMAINS ? 'bg-primary animate-pulse' : currentStep === STEPS.QUESTIONS || currentStep === STEPS.LEARNING_STYLE ? 'bg-gray-200' : 'bg-primary'}`} />
+              </div>
+            )}
+
+            {currentStep === STEPS.WELCOME && (
+              <p className="text-gray-600 mt-2">
+                Our AI will analyze your responses to personalize your learning experience
+              </p>
+            )}
+          </CardHeader>
+          
+          <CardContent>
+            {currentStep === STEPS.WELCOME && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <div className="bg-primary/5 rounded-lg p-4">
+                  <div className="flex items-start gap-4">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Bot className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">AI-Powered Learning Analysis</h3>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Our advanced AI system will analyze your learning preferences and create a personalized learning path just for you.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <Feature 
+                    icon={<Brain className="h-5 w-5 text-primary" />}
+                    title="Smart Learning Style Detection"
+                    description="Identifies your optimal learning approach through behavioral analysis"
+                  />
+                  <Feature 
+                    icon={<Sparkles className="h-5 w-5 text-primary" />}
+                    title="Personalized Content Adaptation"
+                    description="Customizes content format and delivery based on your preferences"
+                  />
+                  <Feature 
+                    icon={<School className="h-5 w-5 text-primary" />}
+                    title="Adaptive Learning Path"
+                    description="Creates a dynamic learning journey that evolves with your progress"
+                  />
+                </div>
+              </motion.div>
+            )}
+
+            {/* ...existing steps content... */}
             {renderContent()}
             {renderNavigation()}
-          </div>
-        </motion.div>
+          </CardContent>
+        </Card>
       </main>
+      
+      {/* AI Assistant */}
+      <AiAssistantButton minimized />
+    </div>
+  );
+}
+
+// Helper component for welcome screen features
+function Feature({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+        {icon}
+      </div>
+      <div>
+        <h4 className="font-medium text-gray-900">{title}</h4>
+        <p className="text-sm text-gray-600">{description}</p>
+      </div>
     </div>
   );
 }

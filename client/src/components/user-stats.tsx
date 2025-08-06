@@ -4,22 +4,36 @@ import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Award, Flame, Zap, Trophy } from 'lucide-react';
 
+interface Achievement {
+  type: 'streak' | 'xp' | 'badge' | 'challenge';
+  value: number;
+}
+
+interface Progress {
+  id?: number;
+  userId?: number;
+  courseId: number;
+  progress: number;
+  completed: boolean;
+  currentModuleId?: number;
+}
+
 export default function UserStats() {
   const { user } = useAuth();
   
   // Fetch user's achievements
-  const { data: achievements } = useQuery({
+  const { data: achievements } = useQuery<Achievement[]>({
     queryKey: ["/api/achievements"],
     enabled: !!user,
   });
   
   // Fetch user's progress
-  const { data: progress } = useQuery({
+  const { data: progress } = useQuery<Progress[]>({
     queryKey: ["/api/progress"],
     enabled: !!user,
   });
   
-  // Calculate stats
+  // Calculate stats with zero defaults for new users
   const calculateStats = () => {
     const stats = {
       streakDays: 0,
@@ -28,7 +42,8 @@ export default function UserStats() {
       challengesCompleted: 0,
     };
     
-    if (achievements) {
+    // Only process achievements if they exist
+    if (achievements && achievements.length > 0) {
       // Find streak days
       const streakAchievement = achievements.find(a => a.type === 'streak');
       if (streakAchievement) {
@@ -46,16 +61,6 @@ export default function UserStats() {
       // Count completed challenges
       const challenges = achievements.filter(a => a.type === 'challenge');
       stats.challengesCompleted = challenges.length;
-    }
-    
-    // If no achievements yet, set default values for better UX
-    if (!achievements || achievements.length === 0) {
-      // Count completed modules as challenges
-      if (progress && progress.length > 0) {
-        stats.challengesCompleted = progress.filter(p => p.completed).length;
-        stats.xpPoints = progress.reduce((total, p) => total + Math.floor(p.progress * 10), 0);
-        stats.streakDays = 1; // Assume at least 1 day if they have any progress
-      }
     }
     
     return stats;

@@ -1,8 +1,18 @@
 import express, { type Request, Response, NextFunction } from "express";
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
+
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { connectMongo } from "./mongo";
+import path from "path";
+import { fileURLToPath } from "url";
+import { setupCors } from "./cors";
 
 const app = express();
+setupCors(app);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -37,7 +47,25 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await connectMongo();
   const server = await registerRoutes(app);
+
+  // Serve index.html for all non-API, non-static GET requests (SPA fallback)
+  app.use((req, res, next) => {
+    if (
+      req.method === "GET" &&
+      !req.path.startsWith("/api") &&
+      !req.path.startsWith("/public") &&
+      !req.path.includes(".") // skip static files
+    ) {
+      // __dirname workaround for ES modules
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = path.dirname(__filename);
+      res.sendFile(path.join(__dirname, "../dist/public/index.html"));
+    } else {
+      next();
+    }
+  });
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -56,15 +84,10 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
+  const PORT = process.env.PORT || 5000;
+  const HOST = process.env.HOST || 'localhost'; // Change from '0.0.0.0' to 'localhost'
+
+  app.listen(PORT, HOST, () => {
+    console.log(`Server running on http://${HOST}:${PORT}`);
   });
 })();
