@@ -47,9 +47,6 @@ EduSmart/
 
 
 ✅ 1. Start the Frontend (React + Vite + API Connection)
-bash
-Copy
-Edit
 cd client
 npm install
 npm run dev
@@ -58,10 +55,6 @@ Frontend runs at: http://localhost:5173
 ✔️ This connects to the backend and database automatically (configured via Vite proxy).
 
 ✅ 2. Start the Backend (Vite-powered APIs)
-bash
-Copy
-Edit
-cd ../server
 npm install
 npx vite
 Backend APIs run at: [http://localhost:3000] (or whichever port you set)
@@ -69,9 +62,6 @@ Backend APIs run at: [http://localhost:3000] (or whichever port you set)
 ✔️ You can define backend logic in server/index.js and API routes under server/routes.
 
 ⚙️ Example Vite Proxy Setup (in client/vite.config.js)
-js
-Copy
-Edit
 export default defineConfig({
   server: {
     proxy: {
