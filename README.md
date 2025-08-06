@@ -59,18 +59,6 @@ npm install
 npx vite
 Backend APIs run at: [http://localhost:3000] (or whichever port you set)
 
-✔️ You can define backend logic in server/index.js and API routes under server/routes.
-
-⚙️ Example Vite Proxy Setup (in client/vite.config.js)
-export default defineConfig({
-  server: {
-    proxy: {
-      '/api': 'http://localhost:3000'
-    }
-  }
-});
-
-
 🔧 Tech Stack
 Layer	Tech Used
 Frontend	React, Vite, Tailwind, Bootstrap
