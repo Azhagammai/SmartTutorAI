@@ -71,4 +71,23 @@ Database	MongoDB (or Firebase/local)
 💡 Innovation Note
 EduSmart is not just an app — it’s a smart companion for learners, designed to help you grow at your own pace with intelligent feedback and motivation.
 
+```
+## 📸 SnapShot
+
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/14799e53-c51c-4108-9c78-b181fbf64058" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/f5e8bc8c-7d20-4610-b749-8ff13be48cb2" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/bbb5f334-4826-4e02-ae54-1ad44dbf13ee" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/198409a8-be0b-4e6b-b5ac-732e5e91219c" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/d10bcdf3-c1ce-4fb5-becb-d35d0739a3f8" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/e1f203bf-34ba-4ba1-8585-aff2249ba409" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/bce998cd-e775-4ed4-804c-8083d34387b3" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/156035cd-4d34-4c02-9307-0129373e1189" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/7985a659-08a4-43a4-90bc-e2161ce2b969" />
+<img width="1920" height="1080" alt="Screenshot (106)" src="https://github.com/user-attachments/assets/5f68e45e-1737-4d9a-a419-5594a98984d5" />
+
+
+
+
+
+
 
