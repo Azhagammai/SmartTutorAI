@@ -84,6 +84,8 @@ EduSmart is not just an app — it’s a smart companion for learners, designed 
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/156035cd-4d34-4c02-9307-0129373e1189" />
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/7985a659-08a4-43a4-90bc-e2161ce2b969" />
 <img width="1920" height="1080" alt="Screenshot (106)" src="https://github.com/user-attachments/assets/5f68e45e-1737-4d9a-a419-5594a98984d5" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/42b314b5-472f-4359-83cd-82d7eff1dd51" />
+
 
 
 
