@@ -1,6 +1,6 @@
-# 🎓 EduSmart - Smart Learning Platform with AI-Personalized Tutors
+# 🎓 SmartTutorAI - Smart Learning Platform with AI-Personalized Tutors
 
-EduSmart is a full-stack, AI-powered educational platform that tailors learning experiences to individual users. Featuring **Nova**, your AI tutor, EduSmart delivers a smarter, more interactive, and gamified way to learn.
+SmartTutorAI is a full-stack, AI-powered educational platform that tailors learning experiences to individual users. Featuring **Nova**, your AI tutor, EduSmart delivers a smarter, more interactive, and gamified way to learn.
 
 ---
 
